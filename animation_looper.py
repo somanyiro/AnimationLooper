@@ -78,9 +78,10 @@ class RemoveFrameOperator(bpy.types.Operator):
             self.report({'INFO'}, f"Removing keyframe on frame 1 in {fcurve.data_path}")
             
             # Find and remove keyframe points at frame 1
-            fcurve.keyframe_points.remove(
-                next((kp for kp in fcurve.keyframe_points if kp.co[0] == 1), None)
-            )
+            for point in fcurve.keyframe_points:
+                if point.co[0] == 1:
+                    fcurve.keyframe_points.remove(point)
+                    #self.report({'INFO'}, f"Removed keyframe on frame 1 in {fcurve.data_path}")
             
             # Update the F-Curve
             fcurve.update()
