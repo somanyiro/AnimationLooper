@@ -15,8 +15,8 @@ import bpy  # Importing Blender's Python API
 
 # Define a simple operator (action)
 class MakeLoopOperator(bpy.types.Operator):
-    bl_idname = "object.make_loop_operator"  # Unique identifier for the operator
-    bl_label = "Make Loop"  # Label displayed on the button
+    bl_idname = "object.make_loop_operator"
+    bl_label = "Make Loop"
 
     def execute(self, context):
         # Add your functionality here. We'll just print a message for now.
@@ -59,7 +59,7 @@ class RemoveRootMotionOperator(bpy.types.Operator):
         
         return {'FINISHED'}
     
-# Define a Panel (UI element)
+
 class MakeLoopPanel(bpy.types.Panel):
     bl_label = "Make Loop Panel"  # Panel label
     bl_idname = "OBJECT_PT_make_loop_panel"  # Unique identifier for the panel
@@ -72,18 +72,15 @@ class MakeLoopPanel(bpy.types.Panel):
         layout.operator("object.make_loop_operator")
         layout.operator("object.remove_root_motion_operator")
 
-# Registering the addon
 def register():
     bpy.utils.register_class(MakeLoopOperator)
     bpy.utils.register_class(MakeLoopPanel)
     bpy.utils.register_class(RemoveRootMotionOperator)
 
-# Unregistering the addon
 def unregister():
     bpy.utils.unregister_class(MakeLoopOperator)
     bpy.utils.unregister_class(MakeLoopPanel)
     bpy.utils.unregister_class(RemoveRootMotionOperator)
 
-# If the script is run directly, register the classes
 if __name__ == "__main__":
     register()
