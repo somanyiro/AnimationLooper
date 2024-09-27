@@ -48,7 +48,7 @@ class MakeLoopOperator(bpy.types.Operator):
 
         # Call the loop_animation function with the selected object
         try:
-            loop_animation(obj.name, self.ratio, self.dt)
+            loop_animation(obj.name, self.ratio, self.dt, self)
             self.report({'INFO'}, f"Looped animation for {obj.name}")
         except Exception as e:
             self.report({'ERROR'}, f"Failed to loop animation: {e}")
@@ -57,7 +57,7 @@ class MakeLoopOperator(bpy.types.Operator):
         return {'FINISHED'}
     
     
-def loop_animation(object_name, ratio, dt):
+def loop_animation(object_name, ratio, dt, op):
     obj = bpy.data.objects[object_name]
     action = obj.animation_data.action
     
@@ -73,7 +73,7 @@ def loop_animation(object_name, ratio, dt):
         bpy.context.scene.frame_set(frame)
         raw_bone_positions.append([bone.location.copy() for bone in bones])
         raw_bone_rotations.append([bone.rotation_quaternion.copy() for bone in bones])
-    
+
     # Prepare arrays to store the looped results
     looped_bone_positions = [[Vector() for _ in bones] for _ in range(num_frames)]
     looped_bone_rotations = [[Quaternion() for _ in bones] for _ in range(num_frames)]
@@ -84,20 +84,32 @@ def loop_animation(object_name, ratio, dt):
     pos_diff, vel_diff = compute_start_end_positional_difference(raw_bone_positions, dt)
     rot_diff, ang_diff = compute_start_end_rotational_difference(raw_bone_rotations, dt)
     
+    op.report({'INFO'}, f"positional difference: {pos_diff[1]}")
+    op.report({'INFO'}, f"velocity difference: {vel_diff[1]}")
+    op.report({'INFO'}, f"rotational difference: {rot_diff[1]}")
+    op.report({'INFO'}, f"angular difference: {ang_diff[1]}")
+
     # Compute offsets
     compute_linear_offsets(offset_bone_positions, pos_diff, ratio)
     compute_linear_offsets(offset_bone_rotations, rot_diff, ratio)
     
+    op.report({'INFO'}, f"offset positional difference: {offset_bone_positions[0][1]}")
+    op.report({'INFO'}, f"offset rotational difference: {offset_bone_rotations[0][1]}")
+
     # Apply offsets
     apply_positional_offsets(looped_bone_positions, raw_bone_positions, offset_bone_positions)
     apply_rotational_offsets(looped_bone_rotations, raw_bone_rotations, offset_bone_rotations)
     
+    op.report({'INFO'}, f"original rotation on frame 1: {raw_bone_rotations[0][1]}")
+    op.report({'INFO'}, f"looped rotation on frame 1: {looped_bone_rotations[0][1]}")
+
     # Write the looped animation back to Blender
     for frame in range(num_frames):
         bpy.context.scene.frame_set(frame)
         for idx, bone in enumerate(bones):
             bone.location = looped_bone_positions[frame][idx]
             bone.rotation_quaternion = looped_bone_rotations[frame][idx]
+            
         bpy.context.view_layer.update()
 
     bpy.context.scene.frame_set(0)
@@ -140,8 +152,9 @@ def quat_differentiate_angular_velocity(q1, q2, dt):
 def compute_linear_offsets(offsets, diff, ratio):
     for i in range(len(offsets)):
         for j in range(len(offsets[i])):
-            factor = ratio * (ratio - 1.0) * (i / (len(offsets) - 1))
-            offsets[i][j] = factor * diff[j]
+            #factor = ratio * (ratio - 1.0) * (i / (len(offsets) - 1))
+            #offsets[i][j] = factor * diff[j]
+            offsets[i][j] = lerp(ratio, ratio-1.0, i / (len(offsets) - 1)) * diff[j]
 
 
 def apply_positional_offsets(looped_positions, raw_positions, offsets):
@@ -154,6 +167,8 @@ def apply_rotational_offsets(looped_rotations, raw_rotations, offsets):
             for j in range(len(raw_rotations[i])):
                 looped_rotations[i][j] = Quaternion(offsets[i][j]).normalized() @ raw_rotations[i][j]
 
+def lerp(a: float, b: float, t: float) -> float:
+    return a + (b - a) * t
 
 class RemoveRootMotionOperator(bpy.types.Operator):
     bl_idname = "object.remove_root_motion_operator"
