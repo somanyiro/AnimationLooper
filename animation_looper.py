@@ -46,9 +46,9 @@ class MakeLoopOperator(bpy.types.Operator):
             self.report({'ERROR'}, "Selected object has no animation data")
             return {'CANCELLED'}
 
+        loop_animation(obj.name, self.ratio, self.dt, self)
         # Call the loop_animation function with the selected object
         try:
-            loop_animation(obj.name, self.ratio, self.dt, self)
             self.report({'INFO'}, f"Looped animation for {obj.name}")
         except Exception as e:
             self.report({'ERROR'}, f"Failed to loop animation: {e}")
@@ -100,10 +100,69 @@ def loop_animation(object_name, ratio, dt, op):
     apply_positional_offsets(looped_bone_positions, raw_bone_positions, offset_bone_positions)
     apply_rotational_offsets(looped_bone_rotations, raw_bone_rotations, offset_bone_rotations)
     
-    op.report({'INFO'}, f"original rotation on frame 1: {raw_bone_rotations[0][1]}")
-    op.report({'INFO'}, f"looped rotation on frame 1: {looped_bone_rotations[0][1]}")
+    op.report({'INFO'}, f"original position on frame 1: {raw_bone_positions[0][1]}")
+    op.report({'INFO'}, f"looped position on frame 1: {looped_bone_positions[0][1]}")
 
     # Write the looped animation back to Blender
+    
+    # Dictionaries to hold the FCurves for location and rotation_quaternion for each bone
+    
+    fcurves_location = {bone.name: [] for bone in bones}
+    fcurves_rotation = {bone.name: [] for bone in bones}
+
+    # Locate existing FCurves for location and rotation_quaternion
+    for fcurve in action.fcurves:
+        for bone in bones:
+            if f'pose.bones["{bone.name}"].location' in fcurve.data_path:
+                fcurves_location[bone.name].append(fcurve)
+            elif f'pose.bones["{bone.name}"].rotation_quaternion' in fcurve.data_path:
+                fcurves_rotation[bone.name].append(fcurve)
+
+    # Loop through each frame and modify the keyframe points in the FCurves
+    for frame in range(num_frames):
+        for idx, bone in enumerate(bones):
+            # Modify existing keyframes for location (x, y, z)
+            if bone.name in fcurves_location:
+                for axis in range(3):  # X, Y, Z
+                    try:
+                        fcurve = fcurves_location[bone.name][axis]
+                        keyframe_points = fcurve.keyframe_points
+                        # Find and modify the keyframe for this frame
+                        for keyframe in keyframe_points:
+                            if round(keyframe.co[0]) == frame:
+                                keyframe.co[1] = looped_bone_positions[frame][idx][axis]
+                                break
+                    except:
+                        pass
+                        #op.report({'INFO'}, f"No position keyframe points for {bone.name} in axis {axis} on frame {frame}")
+                    
+            
+            # Modify existing keyframes for rotation_quaternion (w, x, y, z)
+            if bone.name in fcurves_rotation:
+                for axis in range(4):  # W, X, Y, Z
+                    try:
+                        fcurve = fcurves_rotation[bone.name][axis]
+                        keyframe_points = fcurve.keyframe_points
+                        # Find and modify the keyframe for this frame
+                        for keyframe in keyframe_points:
+                            if round(keyframe.co[0]) == frame:
+                                keyframe.co[1] = looped_bone_rotations[frame][idx][axis]
+                                break
+                    except:
+                        pass
+                        #op.report({'INFO'}, f"No rotation keyframe points for {bone.name} in axis {axis} on frame {frame}")
+    
+    # Ensure FCurves are updated
+    for fcurves in [fcurves_location, fcurves_rotation]:
+        for bone_fcurves in fcurves.values():
+            for fcurve in bone_fcurves:
+                fcurve.update()
+
+    # Update the scene so the changes are reflected
+    bpy.context.view_layer.update()
+
+    #old solution
+    '''
     for frame in range(num_frames):
         bpy.context.scene.frame_set(frame)
         for idx, bone in enumerate(bones):
@@ -111,8 +170,18 @@ def loop_animation(object_name, ratio, dt, op):
             bone.rotation_quaternion = looped_bone_rotations[frame][idx]
             
         bpy.context.view_layer.update()
-
+    
     bpy.context.scene.frame_set(0)
+    '''
+    #own custom solution
+    '''
+    for fcurve in action.fcurves:
+        if "location" in fcurve.data_path:
+            pass
+        if "rotation" in fcurve.data_path:
+    '''
+
+    
 
 
 
@@ -205,7 +274,32 @@ class RemoveRootMotionOperator(bpy.types.Operator):
                         keyframe.co[1] = 0  # Set the keyframe value (Y-coordinate) to 0
         
         return {'FINISHED'}
-    
+
+class SnapKeysToFramesOperator(bpy.types.Operator):
+    bl_idname = "object.snap_keys_to_frames_operator"
+    bl_label = "Snap Keys to Frames"
+    bl_description = "Snap keyframes to round frame numbers"
+
+    def execute(self, context):
+        obj = context.object
+
+        if obj is None or obj.type != 'ARMATURE':
+            self.report({'WARNING'}, "No armature selected")
+            return {'CANCELLED'}
+        
+        if obj.animation_data is None or obj.animation_data.action is None:
+            self.report({'WARNING'}, "No animation data found")
+            return {'CANCELLED'}
+        
+        action = obj.animation_data.action
+        for fcurve in action.fcurves:
+            for keyframe in fcurve.keyframe_points:
+                keyframe.co[0] = round(keyframe.co[0])
+            fcurve.update()
+
+        self.report({'INFO'}, "Keyframes snapped to frame numbers")
+        return {'FINISHED'}
+        
 
 class MakeLoopPanel(bpy.types.Panel):
     bl_label = "Make Loop Panel"  # Panel label
@@ -219,16 +313,19 @@ class MakeLoopPanel(bpy.types.Panel):
 
         layout.operator("object.make_loop_operator")
         layout.operator("object.remove_root_motion_operator")
+        layout.operator("object.snap_keys_to_frames_operator")
 
 def register():
     bpy.utils.register_class(MakeLoopOperator)
     bpy.utils.register_class(MakeLoopPanel)
     bpy.utils.register_class(RemoveRootMotionOperator)
+    bpy.utils.register_class(SnapKeysToFramesOperator)
 
 def unregister():
     bpy.utils.unregister_class(MakeLoopOperator)
     bpy.utils.unregister_class(MakeLoopPanel)
     bpy.utils.unregister_class(RemoveRootMotionOperator)
+    bpy.utils.unregister_class(SnapKeysToFramesOperator)
 
 if __name__ == "__main__":
     register()
