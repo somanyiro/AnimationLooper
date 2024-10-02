@@ -27,11 +27,8 @@ class MakeLoopOperator(bpy.types.Operator):
         max=1.0
     )
 
-    dt: bpy.props.FloatProperty(
-        name="Time Delta",
-        description="Time delta for computing velocity",
-        default=1.0 / 60.0
-    )
+    dt = 1.0/60.0
+
     def invoke(self, context, event):
         wm = context.window_manager
         return wm.invoke_props_dialog(self)
@@ -63,7 +60,7 @@ def loop_animation(object_name, ratio, dt, op):
     
     # Assuming we're working with bone animations in an armature
     bones = obj.pose.bones
-    num_frames = int(action.frame_range[1] - action.frame_range[0])
+    num_frames = int(action.frame_range[1] - action.frame_range[0])+1
     
     # Gather raw bone positions and rotations over time (fcurve sampling)
     raw_bone_positions = []
@@ -84,24 +81,24 @@ def loop_animation(object_name, ratio, dt, op):
     pos_diff, vel_diff = compute_start_end_positional_difference(raw_bone_positions, dt)
     rot_diff, ang_diff = compute_start_end_rotational_difference(raw_bone_rotations, dt)
     
-    op.report({'INFO'}, f"positional difference: {pos_diff[1]}")
-    op.report({'INFO'}, f"velocity difference: {vel_diff[1]}")
-    op.report({'INFO'}, f"rotational difference: {rot_diff[1]}")
-    op.report({'INFO'}, f"angular difference: {ang_diff[1]}")
+    op.report({'INFO'}, f"positional difference: {pos_diff[len(pos_diff) - 1]}")
+    op.report({'INFO'}, f"velocity difference: {vel_diff[len(vel_diff) - 1]}")
+    op.report({'INFO'}, f"rotational difference: {rot_diff[len(rot_diff) - 1]}")
+    op.report({'INFO'}, f"angular difference: {ang_diff[len(ang_diff) - 1]}")
 
     # Compute offsets
     compute_linear_offsets(offset_bone_positions, pos_diff, ratio)
     compute_linear_offsets(offset_bone_rotations, rot_diff, ratio)
     
-    op.report({'INFO'}, f"offset positional difference: {offset_bone_positions[0][1]}")
-    op.report({'INFO'}, f"offset rotational difference: {offset_bone_rotations[0][1]}")
+    op.report({'INFO'}, f"offset positional difference: {offset_bone_positions[len(offset_bone_positions) - 1][1]}")
+    op.report({'INFO'}, f"offset rotational difference: {offset_bone_rotations[len(offset_bone_rotations) - 1][1]}")
 
     # Apply offsets
     apply_positional_offsets(looped_bone_positions, raw_bone_positions, offset_bone_positions)
     apply_rotational_offsets(looped_bone_rotations, raw_bone_rotations, offset_bone_rotations)
     
-    op.report({'INFO'}, f"original position on frame 1: {raw_bone_positions[0][1]}")
-    op.report({'INFO'}, f"looped position on frame 1: {looped_bone_positions[0][1]}")
+    op.report({'INFO'}, f"original position on frame 1: {raw_bone_positions[len(raw_bone_positions) - 1][1]}")
+    op.report({'INFO'}, f"looped position on frame 1: {looped_bone_positions[len(looped_bone_positions) - 1][1]}")
 
     # Write the looped animation back to Blender
     
@@ -156,6 +153,8 @@ def loop_animation(object_name, ratio, dt, op):
     for fcurves in [fcurves_location, fcurves_rotation]:
         for bone_fcurves in fcurves.values():
             for fcurve in bone_fcurves:
+                for keyframe in fcurve.keyframe_points:
+                    keyframe.interpolation = 'LINEAR'
                 fcurve.update()
 
     # Update the scene so the changes are reflected
@@ -234,7 +233,7 @@ def apply_positional_offsets(looped_positions, raw_positions, offsets):
 def apply_rotational_offsets(looped_rotations, raw_rotations, offsets):
         for i in range(len(raw_rotations)):
             for j in range(len(raw_rotations[i])):
-                looped_rotations[i][j] = Quaternion(offsets[i][j]).normalized() @ raw_rotations[i][j]
+                looped_rotations[i][j] = Quaternion(offsets[i][j]).inverted() @ raw_rotations[i][j]
 
 def lerp(a: float, b: float, t: float) -> float:
     return a + (b - a) * t
@@ -306,7 +305,7 @@ class MakeLoopPanel(bpy.types.Panel):
     bl_idname = "OBJECT_PT_make_loop_panel"  # Unique identifier for the panel
     bl_space_type = 'VIEW_3D'  # Where this panel will appear
     bl_region_type = 'UI'  # The region of the interface
-    bl_category = "Tool"  # The tab where it will appear
+    bl_category = "Edit"  # The tab where it will appear
 
     def draw(self, context):
         layout = self.layout
