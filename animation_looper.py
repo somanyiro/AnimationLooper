@@ -43,9 +43,8 @@ class MakeLoopOperator(bpy.types.Operator):
             self.report({'ERROR'}, "Selected object has no animation data")
             return {'CANCELLED'}
 
-        loop_animation(obj.name, self.ratio, self.dt, self)
-        # Call the loop_animation function with the selected object
         try:
+            loop_animation(obj.name, self.ratio, self.dt, self)
             self.report({'INFO'}, f"Looped animation for {obj.name}")
         except Exception as e:
             self.report({'ERROR'}, f"Failed to loop animation: {e}")
@@ -80,11 +79,28 @@ def loop_animation(object_name, ratio, dt, op):
     # Calculate positional and rotational differences
     pos_diff, vel_diff = compute_start_end_positional_difference(raw_bone_positions, dt)
     rot_diff, ang_diff = compute_start_end_rotational_difference(raw_bone_rotations, dt)
-    
-    op.report({'INFO'}, f"positional difference: {pos_diff[len(pos_diff) - 1]}")
-    op.report({'INFO'}, f"velocity difference: {vel_diff[len(vel_diff) - 1]}")
-    op.report({'INFO'}, f"rotational difference: {rot_diff[len(rot_diff) - 1]}")
-    op.report({'INFO'}, f"angular difference: {ang_diff[len(ang_diff) - 1]}")
+    '''
+    for idx, bone in enumerate(bones):
+        raw_bone_positions[-1][idx] -= pos_diff[idx]
+
+    # Apply rotational difference to the last frame
+    for idx, bone in enumerate(bones):
+        raw_bone_rotations[-1][idx] = Quaternion(rot_diff[idx]).inverted() @ raw_bone_rotations[-1][idx]
+
+    # Report the results for debugging
+    for idx, bone in enumerate(bones):
+        print(f"Bone {bone.name}:")
+        print(f"  Position (first frame): {raw_bone_positions[0][idx]}")
+        print(f"  Position (last frame): {raw_bone_positions[-1][idx]}")
+        print(f"  Rotation (first frame): {raw_bone_rotations[0][idx]}")
+        print(f"  Rotation (last frame): {raw_bone_rotations[-1][idx]}")
+
+    return
+'''
+    op.report({'INFO'}, f"positional difference: {pos_diff[1]}")
+    op.report({'INFO'}, f"velocity difference: {vel_diff[1]}")
+    op.report({'INFO'}, f"rotational difference: {rot_diff[1]}")
+    op.report({'INFO'}, f"angular difference: {ang_diff[1]}")
 
     # Compute offsets
     compute_linear_offsets(offset_bone_positions, pos_diff, ratio)
@@ -103,7 +119,6 @@ def loop_animation(object_name, ratio, dt, op):
     # Write the looped animation back to Blender
     
     # Dictionaries to hold the FCurves for location and rotation_quaternion for each bone
-    
     fcurves_location = {bone.name: [] for bone in bones}
     fcurves_rotation = {bone.name: [] for bone in bones}
 
@@ -201,7 +216,7 @@ def compute_start_end_rotational_difference(rot, dt):
     for j in range(len(rot[0])):
         diff_rot = quat_to_scaled_angle_axis(rot[-1][j].rotation_difference(rot[0][j]))
         diff_vel = quat_differentiate_angular_velocity(rot[-1][j], rot[-2][j], dt) - \
-                quat_differentiate_angular_velocity(rot[1][j], rot[0][j], dt)
+                   quat_differentiate_angular_velocity(rot[1][j], rot[0][j], dt)
         rot_diff.append(diff_rot)
         vel_diff.append(diff_vel)
     return rot_diff, vel_diff
@@ -222,6 +237,7 @@ def compute_linear_offsets(offsets, diff, ratio):
         for j in range(len(offsets[i])):
             #factor = ratio * (ratio - 1.0) * (i / (len(offsets) - 1))
             #offsets[i][j] = factor * diff[j]
+            
             offsets[i][j] = lerp(ratio, ratio-1.0, i / (len(offsets) - 1)) * diff[j]
 
 
@@ -233,7 +249,7 @@ def apply_positional_offsets(looped_positions, raw_positions, offsets):
 def apply_rotational_offsets(looped_rotations, raw_rotations, offsets):
         for i in range(len(raw_rotations)):
             for j in range(len(raw_rotations[i])):
-                looped_rotations[i][j] = Quaternion(offsets[i][j]).inverted() @ raw_rotations[i][j]
+                looped_rotations[i][j] = (Quaternion(offsets[i][j]).inverted() @ raw_rotations[i][j]).normalized()
 
 def lerp(a: float, b: float, t: float) -> float:
     return a + (b - a) * t
@@ -241,7 +257,14 @@ def lerp(a: float, b: float, t: float) -> float:
 class RemoveRootMotionOperator(bpy.types.Operator):
     bl_idname = "object.remove_root_motion_operator"
     bl_label = "Remove Root Motion"
-    bl_description = "Remove keyframes on X and Z axes for the Hips bone"
+    bl_description = "Remove keyframes on the Hips bone"
+
+    x: bpy.props.BoolProperty(default=True)
+    y: bpy.props.BoolProperty(default=False)
+    z: bpy.props.BoolProperty(default=True)
+
+    def invoke(self, context, event):
+        return context.window_manager.invoke_props_dialog(self)
 
     def execute(self, context):
         obj = context.object  # Get the currently selected object
@@ -262,17 +285,28 @@ class RemoveRootMotionOperator(bpy.types.Operator):
             # We need to target the 'pose.bones["Hips"].location' data path
             if fcurve.data_path == 'pose.bones["Hips"].location':
                 # For X-axis (location[0]) and Z-axis (location[2])
-                if fcurve.array_index == 0:  # X-axis (location[0])
-                    self.report({'INFO'}, "Zeroing X-axis keyframes for Hips")
+                if fcurve.array_index == 0 and self.x:  # X-axis (location[0])
                     for keyframe in fcurve.keyframe_points:
                         keyframe.co[1] = 0  # Set the keyframe value (Y-coordinate) to 0
 
-                elif fcurve.array_index == 2:  # Z-axis (location[2])
-                    self.report({'INFO'}, "Zeroing Z-axis keyframes for Hips")
+                elif fcurve.array_index == 1 and self.y:  # Z-axis (location[2])
+                    for keyframe in fcurve.keyframe_points:
+                        keyframe.co[1] = 0  # Set the keyframe value (Y-coordinate) to 0
+
+                elif fcurve.array_index == 2 and self.z:  # Z-axis (location[2])
                     for keyframe in fcurve.keyframe_points:
                         keyframe.co[1] = 0  # Set the keyframe value (Y-coordinate) to 0
         
+        if self.x:
+            self.report({'INFO'}, "Root motion removed on x-axis")
+        if self.y:
+            self.report({'INFO'}, "Root motion removed on y-axis")
+        if self.z:
+            self.report({'INFO'}, "Root motion removed on z-axis")
+
         return {'FINISHED'}
+
+
 
 class SnapKeysToFramesOperator(bpy.types.Operator):
     bl_idname = "object.snap_keys_to_frames_operator"
@@ -297,6 +331,7 @@ class SnapKeysToFramesOperator(bpy.types.Operator):
             fcurve.update()
 
         self.report({'INFO'}, "Keyframes snapped to frame numbers")
+
         return {'FINISHED'}
         
 
