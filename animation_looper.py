@@ -52,7 +52,6 @@ class MakeLoopOperator(bpy.types.Operator):
 
         return {'FINISHED'}
     
-    
 def loop_animation(object_name, ratio, dt, op):
     obj = bpy.data.objects[object_name]
     action = obj.animation_data.action
@@ -96,7 +95,7 @@ def loop_animation(object_name, ratio, dt, op):
         print(f"  Rotation (last frame): {raw_bone_rotations[-1][idx]}")
 
     return
-'''
+    '''
     op.report({'INFO'}, f"positional difference: {pos_diff[1]}")
     op.report({'INFO'}, f"velocity difference: {vel_diff[1]}")
     op.report({'INFO'}, f"rotational difference: {rot_diff[1]}")
@@ -195,7 +194,53 @@ def loop_animation(object_name, ratio, dt, op):
         if "rotation" in fcurve.data_path:
     '''
 
-    
+class AlignFirstLastFrameOperator(bpy.types.Operator):
+    bl_idname = "object.align_first_last_frame_operator"
+    bl_label = "Align First and Last Frame"
+    bl_description = "Calculate and apply the positional and rotational differences between the first and last frame"
+
+    def execute(self, context):
+        obj = context.object  # Get the currently selected object
+        
+        # Ensure the object has animation data
+        if obj.animation_data is None or obj.animation_data.action is None:
+            self.report({'ERROR'}, "Selected object has no animation data")
+            return {'CANCELLED'}
+        
+        bones = obj.pose.bones
+        action = obj.animation_data.action
+        num_frames = int(action.frame_range[1] - action.frame_range[0]) + 1
+
+        # Gather bone positions and rotations for the first and last frames
+        bpy.context.scene.frame_set(0)  # Set to the first frame
+        first_frame_positions = [bone.location.copy() for bone in bones]
+        first_frame_rotations = [bone.rotation_quaternion.copy() for bone in bones]
+
+        bpy.context.scene.frame_set(num_frames - 1)  # Set to the last frame
+        last_frame_positions = [bone.location.copy() for bone in bones]
+        last_frame_rotations = [bone.rotation_quaternion.copy() for bone in bones]
+
+        # Calculate positional differences
+        #pos_diff = [last - first for last, first in zip(last_frame_positions, first_frame_positions)]
+        # Calculate rotational differences
+        #rot_diff = [last.rotation_difference(first) for last, first in zip(last_frame_rotations, first_frame_rotations)]
+
+        # Apply the inverse of the differences to the last frame
+        for idx, bone in enumerate(bones):
+            pos_diff = last_frame_positions[idx] - first_frame_positions[idx]
+            rot_diff = first_frame_rotations[idx].rotation_difference(last_frame_rotations[idx]).normalized()
+            self.report({'INFO'}, f"{bone.name} first frame original position: {first_frame_positions[idx]}")
+            self.report({'INFO'}, f"{bone.name} last frame original position: {last_frame_positions[idx]}")
+            self.report({'INFO'}, f"{bone.name} first frame recreated position: {last_frame_positions[idx] - pos_diff}")
+            self.report({'INFO'}, f"{bone.name} first frame original rotation: {first_frame_rotations[idx]}")
+            self.report({'INFO'}, f"{bone.name} last frame original rotation: {last_frame_rotations[idx]}")
+            self.report({'INFO'}, f"{bone.name} first frame recreated rotation: {(last_frame_rotations[idx] @ rot_diff.inverted())}")
+
+        # Update the scene to reflect the changes
+        bpy.context.view_layer.update()
+
+        self.report({'INFO'}, "Aligned the last frame to the first frame.")
+        return {'FINISHED'}
 
 
 
@@ -249,7 +294,7 @@ def apply_positional_offsets(looped_positions, raw_positions, offsets):
 def apply_rotational_offsets(looped_rotations, raw_rotations, offsets):
         for i in range(len(raw_rotations)):
             for j in range(len(raw_rotations[i])):
-                looped_rotations[i][j] = (Quaternion(offsets[i][j]).inverted() @ raw_rotations[i][j]).normalized()
+                looped_rotations[i][j] = (Quaternion(offsets[i][j] * -1) @ raw_rotations[i][j]).normalized()
 
 def lerp(a: float, b: float, t: float) -> float:
     return a + (b - a) * t
@@ -349,17 +394,23 @@ class MakeLoopPanel(bpy.types.Panel):
         layout.operator("object.remove_root_motion_operator")
         layout.operator("object.snap_keys_to_frames_operator")
 
+        layout.operator("object.align_first_last_frame_operator")
+
 def register():
     bpy.utils.register_class(MakeLoopOperator)
     bpy.utils.register_class(MakeLoopPanel)
     bpy.utils.register_class(RemoveRootMotionOperator)
     bpy.utils.register_class(SnapKeysToFramesOperator)
 
+    bpy.utils.register_class(AlignFirstLastFrameOperator)
+
 def unregister():
     bpy.utils.unregister_class(MakeLoopOperator)
     bpy.utils.unregister_class(MakeLoopPanel)
     bpy.utils.unregister_class(RemoveRootMotionOperator)
     bpy.utils.unregister_class(SnapKeysToFramesOperator)
+
+    bpy.utils.unregister_class(AlignFirstLastFrameOperator)
 
 if __name__ == "__main__":
     register()
