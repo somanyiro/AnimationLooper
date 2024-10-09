@@ -228,13 +228,13 @@ class AlignFirstLastFrameOperator(bpy.types.Operator):
         # Apply the inverse of the differences to the last frame
         for idx, bone in enumerate(bones):
             pos_diff = last_frame_positions[idx] - first_frame_positions[idx]
-            rot_diff = first_frame_rotations[idx].rotation_difference(last_frame_rotations[idx]).normalized()
+            rot_diff = first_frame_rotations[idx].rotation_difference(last_frame_rotations[idx])
             self.report({'INFO'}, f"{bone.name} first frame original position: {first_frame_positions[idx]}")
             self.report({'INFO'}, f"{bone.name} last frame original position: {last_frame_positions[idx]}")
             self.report({'INFO'}, f"{bone.name} first frame recreated position: {last_frame_positions[idx] - pos_diff}")
             self.report({'INFO'}, f"{bone.name} first frame original rotation: {first_frame_rotations[idx]}")
             self.report({'INFO'}, f"{bone.name} last frame original rotation: {last_frame_rotations[idx]}")
-            self.report({'INFO'}, f"{bone.name} first frame recreated rotation: {(last_frame_rotations[idx] @ rot_diff.inverted())}")
+            self.report({'INFO'}, f"{bone.name} first frame recreated rotation: {last_frame_rotations[idx] @ rot_diff.inverted()}")
 
         # Update the scene to reflect the changes
         bpy.context.view_layer.update()
@@ -259,7 +259,7 @@ def compute_start_end_rotational_difference(rot, dt):
     rot_diff = []
     vel_diff = []
     for j in range(len(rot[0])):
-        diff_rot = quat_to_scaled_angle_axis(rot[-1][j].rotation_difference(rot[0][j]))
+        diff_rot = quat_to_scaled_angle_axis(rot[0][j].rotation_difference(rot[-1][j]))
         diff_vel = quat_differentiate_angular_velocity(rot[-1][j], rot[-2][j], dt) - \
                    quat_differentiate_angular_velocity(rot[1][j], rot[0][j], dt)
         rot_diff.append(diff_rot)
@@ -294,7 +294,7 @@ def apply_positional_offsets(looped_positions, raw_positions, offsets):
 def apply_rotational_offsets(looped_rotations, raw_rotations, offsets):
         for i in range(len(raw_rotations)):
             for j in range(len(raw_rotations[i])):
-                looped_rotations[i][j] = (Quaternion(offsets[i][j] * -1) @ raw_rotations[i][j]).normalized()
+                looped_rotations[i][j] = raw_rotations[i][j] @ Quaternion(offsets[i][j])
 
 def lerp(a: float, b: float, t: float) -> float:
     return a + (b - a) * t
