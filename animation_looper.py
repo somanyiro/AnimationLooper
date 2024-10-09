@@ -78,43 +78,15 @@ def loop_animation(object_name, ratio, dt, op):
     # Calculate positional and rotational differences
     pos_diff, vel_diff = compute_start_end_positional_difference(raw_bone_positions, dt)
     rot_diff, ang_diff = compute_start_end_rotational_difference(raw_bone_rotations, dt)
-    '''
-    for idx, bone in enumerate(bones):
-        raw_bone_positions[-1][idx] -= pos_diff[idx]
-
-    # Apply rotational difference to the last frame
-    for idx, bone in enumerate(bones):
-        raw_bone_rotations[-1][idx] = Quaternion(rot_diff[idx]).inverted() @ raw_bone_rotations[-1][idx]
-
-    # Report the results for debugging
-    for idx, bone in enumerate(bones):
-        print(f"Bone {bone.name}:")
-        print(f"  Position (first frame): {raw_bone_positions[0][idx]}")
-        print(f"  Position (last frame): {raw_bone_positions[-1][idx]}")
-        print(f"  Rotation (first frame): {raw_bone_rotations[0][idx]}")
-        print(f"  Rotation (last frame): {raw_bone_rotations[-1][idx]}")
-
-    return
-    '''
-    op.report({'INFO'}, f"positional difference: {pos_diff[1]}")
-    op.report({'INFO'}, f"velocity difference: {vel_diff[1]}")
-    op.report({'INFO'}, f"rotational difference: {rot_diff[1]}")
-    op.report({'INFO'}, f"angular difference: {ang_diff[1]}")
 
     # Compute offsets
     compute_linear_offsets(offset_bone_positions, pos_diff, ratio)
     compute_linear_offsets(offset_bone_rotations, rot_diff, ratio)
     
-    op.report({'INFO'}, f"offset positional difference: {offset_bone_positions[len(offset_bone_positions) - 1][1]}")
-    op.report({'INFO'}, f"offset rotational difference: {offset_bone_rotations[len(offset_bone_rotations) - 1][1]}")
-
     # Apply offsets
     apply_positional_offsets(looped_bone_positions, raw_bone_positions, offset_bone_positions)
     apply_rotational_offsets(looped_bone_rotations, raw_bone_rotations, offset_bone_rotations)
     
-    op.report({'INFO'}, f"original position on frame 1: {raw_bone_positions[len(raw_bone_positions) - 1][1]}")
-    op.report({'INFO'}, f"looped position on frame 1: {looped_bone_positions[len(looped_bone_positions) - 1][1]}")
-
     # Write the looped animation back to Blender
     
     # Dictionaries to hold the FCurves for location and rotation_quaternion for each bone
