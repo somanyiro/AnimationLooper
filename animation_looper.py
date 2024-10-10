@@ -15,9 +15,9 @@ import bpy  # Importing Blender's Python API
 from mathutils import Vector, Quaternion
 
 # Define a simple operator (action)
-class MakeLoopOperator(bpy.types.Operator):
-    bl_idname = "object.make_loop_operator"
-    bl_label = "Make Loop"
+class LoopAnimationOperator(bpy.types.Operator):
+    bl_idname = "object.loop_animation_operator"
+    bl_label = "Loop Animation"
 
     ratio: bpy.props.FloatProperty(
         name="Loop Ratio",
@@ -38,13 +38,19 @@ class MakeLoopOperator(bpy.types.Operator):
         # Get the selected object
         obj = context.object
         
+        if obj is None or obj.type != 'ARMATURE':
+            self.report({'WARNING'}, "No armature selected")
+            return {'CANCELLED'}
+        
         # Ensure the object has animation data
         if obj.animation_data is None or obj.animation_data.action is None:
             self.report({'ERROR'}, "Selected object has no animation data")
             return {'CANCELLED'}
 
+        snap_keys_to_frames(obj.animation_data.action)
+
         try:
-            loop_animation(obj.name, self.ratio, self.dt, self)
+            loop_animation(obj, self.ratio, self.dt, self)
             self.report({'INFO'}, f"Looped animation for {obj.name}")
         except Exception as e:
             self.report({'ERROR'}, f"Failed to loop animation: {e}")
@@ -52,8 +58,7 @@ class MakeLoopOperator(bpy.types.Operator):
 
         return {'FINISHED'}
     
-def loop_animation(object_name, ratio, dt, op):
-    obj = bpy.data.objects[object_name]
+def loop_animation(obj, ratio, dt, op):
     action = obj.animation_data.action
     
     # Assuming we're working with bone animations in an armature
@@ -93,6 +98,7 @@ def loop_animation(object_name, ratio, dt, op):
     fcurves_location = {bone.name: [] for bone in bones}
     fcurves_rotation = {bone.name: [] for bone in bones}
 
+    #TODO: rewrite this in a more efficient way
     # Locate existing FCurves for location and rotation_quaternion
     for fcurve in action.fcurves:
         for bone in bones:
@@ -139,8 +145,6 @@ def loop_animation(object_name, ratio, dt, op):
     for fcurves in [fcurves_location, fcurves_rotation]:
         for bone_fcurves in fcurves.values():
             for fcurve in bone_fcurves:
-                for keyframe in fcurve.keyframe_points:
-                    keyframe.interpolation = 'LINEAR'
                 fcurve.update()
 
     # Update the scene so the changes are reflected
@@ -222,6 +226,12 @@ def apply_rotational_offsets(looped_rotations, raw_rotations, offsets):
 def lerp(a: float, b: float, t: float) -> float:
     return a + (b - a) * t
 
+def snap_keys_to_frames(action):
+    for fcurve in action.fcurves:
+        for keyframe in fcurve.keyframe_points:
+            keyframe.co[0] = round(keyframe.co[0])
+        fcurve.update()
+
 class RemoveRootMotionOperator(bpy.types.Operator):
     bl_idname = "object.remove_root_motion_operator"
     bl_label = "Remove Root Motion"
@@ -274,8 +284,6 @@ class RemoveRootMotionOperator(bpy.types.Operator):
 
         return {'FINISHED'}
 
-
-
 class SnapKeysToFramesOperator(bpy.types.Operator):
     bl_idname = "object.snap_keys_to_frames_operator"
     bl_label = "Snap Keys to Frames"
@@ -293,17 +301,13 @@ class SnapKeysToFramesOperator(bpy.types.Operator):
             return {'CANCELLED'}
         
         action = obj.animation_data.action
-        for fcurve in action.fcurves:
-            for keyframe in fcurve.keyframe_points:
-                keyframe.co[0] = round(keyframe.co[0])
-            fcurve.update()
+        snap_keys_to_frames(action)
 
-        self.report({'INFO'}, "Keyframes snapped to frame numbers")
+        self.report({'INFO'}, "Keyframes snapped to exact frame numbers")
 
         return {'FINISHED'}
         
-
-class MakeLoopPanel(bpy.types.Panel):
+class LooperPanel(bpy.types.Panel):
     bl_label = "Make Loop Panel"  # Panel label
     bl_idname = "OBJECT_PT_make_loop_panel"  # Unique identifier for the panel
     bl_space_type = 'VIEW_3D'  # Where this panel will appear
@@ -313,19 +317,19 @@ class MakeLoopPanel(bpy.types.Panel):
     def draw(self, context):
         layout = self.layout
 
-        layout.operator("object.make_loop_operator")
+        layout.operator("object.loop_animation_operator")
         layout.operator("object.remove_root_motion_operator")
         layout.operator("object.snap_keys_to_frames_operator")
 
 def register():
-    bpy.utils.register_class(MakeLoopOperator)
-    bpy.utils.register_class(MakeLoopPanel)
+    bpy.utils.register_class(LoopAnimationOperator)
+    bpy.utils.register_class(LooperPanel)
     bpy.utils.register_class(RemoveRootMotionOperator)
     bpy.utils.register_class(SnapKeysToFramesOperator)
 
 def unregister():
-    bpy.utils.unregister_class(MakeLoopOperator)
-    bpy.utils.unregister_class(MakeLoopPanel)
+    bpy.utils.unregister_class(LoopAnimationOperator)
+    bpy.utils.unregister_class(LooperPanel)
     bpy.utils.unregister_class(RemoveRootMotionOperator)
     bpy.utils.unregister_class(SnapKeysToFramesOperator)
 
