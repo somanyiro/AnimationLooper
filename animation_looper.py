@@ -30,10 +30,8 @@ class LoopAnimationOperator(bpy.types.Operator):
     dt = 1.0/60.0
 
     def invoke(self, context, event):
-        wm = context.window_manager
-        return wm.invoke_props_dialog(self)
+        return context.window_manager.invoke_props_dialog(self)
 
-    
     def execute(self, context):
         # Get the selected object
         obj = context.object
@@ -98,7 +96,6 @@ def loop_animation(obj, ratio, dt, op):
     fcurves_location = {bone.name: [] for bone in bones}
     fcurves_rotation = {bone.name: [] for bone in bones}
 
-    #TODO: rewrite this in a more efficient way
     # Locate existing FCurves for location and rotation_quaternion
     for fcurve in action.fcurves:
         for bone in bones:
@@ -107,68 +104,38 @@ def loop_animation(obj, ratio, dt, op):
             elif f'pose.bones["{bone.name}"].rotation_quaternion' in fcurve.data_path:
                 fcurves_rotation[bone.name].append(fcurve)
 
-    # Loop through each frame and modify the keyframe points in the FCurves
-    for frame in range(num_frames):
-        for idx, bone in enumerate(bones):
-            # Modify existing keyframes for location (x, y, z)
-            if bone.name in fcurves_location:
-                for axis in range(3):  # X, Y, Z
-                    try:
-                        fcurve = fcurves_location[bone.name][axis]
-                        keyframe_points = fcurve.keyframe_points
-                        # Find and modify the keyframe for this frame
-                        for keyframe in keyframe_points:
-                            if round(keyframe.co[0]) == frame:
-                                keyframe.co[1] = looped_bone_positions[frame][idx][axis]
-                                break
-                    except:
-                        pass
-                        #op.report({'INFO'}, f"No position keyframe points for {bone.name} in axis {axis} on frame {frame}")
-                    
-            
-            # Modify existing keyframes for rotation_quaternion (w, x, y, z)
-            if bone.name in fcurves_rotation:
-                for axis in range(4):  # W, X, Y, Z
-                    try:
-                        fcurve = fcurves_rotation[bone.name][axis]
-                        keyframe_points = fcurve.keyframe_points
-                        # Find and modify the keyframe for this frame
-                        for keyframe in keyframe_points:
-                            if round(keyframe.co[0]) == frame:
-                                keyframe.co[1] = looped_bone_rotations[frame][idx][axis]
-                                break
-                    except:
-                        pass
-                        #op.report({'INFO'}, f"No rotation keyframe points for {bone.name} in axis {axis} on frame {frame}")
-    
+        # Loop through each FCurve for location and rotation
+    for bone_idx, bone in enumerate(bones):
+        bone_name = bone.name
+        
+        # Process location fcurves
+        if bone_name in fcurves_location:
+            for axis, fcurve in enumerate(fcurves_location[bone_name]):  # X, Y, Z axes for location
+                if fcurve is not None:
+                    for keyframe in fcurve.keyframe_points:
+                        frame = int(round(keyframe.co[0]))
+                        if 0 <= frame < num_frames:
+                            keyframe.co[1] = looped_bone_positions[frame][bone_idx][axis]
+
+        # Process rotation fcurves
+        if bone_name in fcurves_rotation:
+            for axis, fcurve in enumerate(fcurves_rotation[bone_name]):  # W, X, Y, Z axes for rotation
+                if fcurve is not None:
+                    for keyframe in fcurve.keyframe_points:
+                        frame = int(round(keyframe.co[0]))
+                        if 0 <= frame < num_frames:
+                            keyframe.co[1] = looped_bone_rotations[frame][bone_idx][axis]
+
     # Ensure FCurves are updated
     for fcurves in [fcurves_location, fcurves_rotation]:
         for bone_fcurves in fcurves.values():
             for fcurve in bone_fcurves:
-                fcurve.update()
-
+                if fcurve is not None:
+                    fcurve.update()
+    
     # Update the scene so the changes are reflected
     bpy.context.view_layer.update()
 
-    #old solution
-    '''
-    for frame in range(num_frames):
-        bpy.context.scene.frame_set(frame)
-        for idx, bone in enumerate(bones):
-            bone.location = looped_bone_positions[frame][idx]
-            bone.rotation_quaternion = looped_bone_rotations[frame][idx]
-            
-        bpy.context.view_layer.update()
-    
-    bpy.context.scene.frame_set(0)
-    '''
-    #own custom solution
-    '''
-    for fcurve in action.fcurves:
-        if "location" in fcurve.data_path:
-            pass
-        if "rotation" in fcurve.data_path:
-    '''
 
 
 def compute_start_end_positional_difference(pos, dt):
