@@ -27,6 +27,22 @@ class LoopAnimationOperator(bpy.types.Operator):
         max=1.0
     )
 
+    blendtime_start: bpy.props.FloatProperty(
+        name="Blend Time Start",
+        description="",
+        default=0.5,
+        min=0.0,
+        max=1.0
+    )
+
+    blendtime_end: bpy.props.FloatProperty(
+        name="Blend Time End",
+        description="",
+        default=0.5,
+        min=0.0,
+        max=1.0
+    )
+
     dt = 1.0/60.0
 
     def invoke(self, context, event):
@@ -83,9 +99,12 @@ def loop_animation(obj, ratio, dt, op):
     rot_diff, ang_diff = compute_start_end_rotational_difference(raw_bone_rotations, dt)
 
     # Compute offsets
-    compute_linear_offsets(offset_bone_positions, pos_diff, ratio)
-    compute_linear_offsets(offset_bone_rotations, rot_diff, ratio)
-    
+    #compute_linear_offsets(offset_bone_positions, pos_diff, ratio)
+    #compute_linear_offsets(offset_bone_rotations, rot_diff, ratio)
+    compute_linear_inertialize_offsets(offset_bone_positions, pos_diff, vel_diff, op.blendtime_start, op.blendtime_end, ratio, dt)
+    compute_linear_inertialize_offsets(offset_bone_rotations, rot_diff, ang_diff, op.blendtime_start, op.blendtime_end, ratio, dt)
+
+
     # Apply offsets
     apply_positional_offsets(looped_bone_positions, raw_bone_positions, offset_bone_positions)
     apply_rotational_offsets(looped_bone_rotations, raw_bone_rotations, offset_bone_rotations)
@@ -178,6 +197,45 @@ def compute_linear_offsets(offsets, diff, ratio):
             #offsets[i][j] = factor * diff[j]
             
             offsets[i][j] = lerp(ratio, ratio-1.0, i / (len(offsets) - 1)) * diff[j]
+
+def compute_linear_inertialize_offsets(offsets, diff_pos, diff_vel, blendtime_start, blendtime_end, ratio, dt):
+    assert 0.0 <= ratio <= 1.0, "Ratio must be between 0 and 1."
+    assert blendtime_start >= 0.0, "Blendtime start must be non-negative."
+    assert blendtime_end >= 0.0, "Blendtime end must be non-negative."
+    
+    rows = len(offsets)      # Number of frames (rows)
+    cols = len(offsets[0])   # Number of joints/bones (cols)
+
+    # Loop over every frame
+    for i in range(rows):
+        t = float(i) / (rows - 1)
+
+        # Loop over every joint (or bone)
+        for j in range(cols):
+            # Initial linear offset (lerp)
+            linear_offset = lerp(ratio, (ratio - 1.0), t) * diff_pos[j]
+
+            # Velocity offset at the start
+            velocity_offset_start = decayed_velocity_offset_cubic([ratio * diff_vel[j]], blendtime_start, i * dt)
+
+            # Velocity offset at the end
+            velocity_offset_end = decayed_velocity_offset_cubic([(1.0 - ratio) * diff_vel[j]], blendtime_end, (rows - 1 - i) * dt)
+
+            # Compute the final offset for the joint
+            offsets[i][j] = linear_offset + velocity_offset_start[0] + velocity_offset_end[0]
+
+def decayed_velocity_offset_cubic(v, blendtime, dt, eps=1e-8):
+    """Compute the decayed velocity offset using cubic decay."""
+    t = clamp(dt / (blendtime + eps), 0, 1)
+
+    c = [vi * blendtime for vi in v]
+    b = [-2 * ci for ci in c]
+    a = c
+    
+    return [a_i * t**3 + b_i * t**2 + c_i for a_i, b_i, c_i in zip(a, b, c)]
+
+def clamp(value, min_val, max_val):
+    return max(min(value, max_val), min_val)
 
 
 def apply_positional_offsets(looped_positions, raw_positions, offsets):
