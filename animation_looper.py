@@ -275,7 +275,7 @@ class SnapKeysToFramesOperator(bpy.types.Operator):
         return {'FINISHED'}
         
 class LooperPanel(bpy.types.Panel):
-    bl_label = "Make Loop Panel"  # Panel label
+    bl_label = "Animation Looper Panel"  # Panel label
     bl_idname = "OBJECT_PT_make_loop_panel"  # Unique identifier for the panel
     bl_space_type = 'VIEW_3D'  # Where this panel will appear
     bl_region_type = 'UI'  # The region of the interface
