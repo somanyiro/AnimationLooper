@@ -2,6 +2,8 @@
 
 This plugin is built on the foundation of [this article](https://theorangeduck.com/page/creating-looping-animations-motion-capture).
 
+<img src="/images/RunAnimation.gif" width="300"> <img src="/images/RunAnimationLooped.gif" width="300">
+
 ## Installation
 
 1. Download the Python script
