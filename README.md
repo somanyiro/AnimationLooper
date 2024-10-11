@@ -1,6 +1,6 @@
 # Blender Animation Looper
 
-This plugin is built on the foundation of [this article](https://theorangeduck.com/page/creating-looping-animations-motion-capture).
+This plugin is built on the foundation of [this article](https://theorangeduck.com/page/creating-looping-animations-motion-capture) by Daniel Holden.
 
 <img src="/images/RunAnimation.gif" width="300"> <img src="/images/RunAnimationLooped.gif" width="300">
 
