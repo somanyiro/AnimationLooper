@@ -1,6 +1,6 @@
 bl_info = {
     "name": "Animation Looper",
-    "blender": (4, 3, 0),  # Blender version
+    "blender": (4, 3, 0),
     "category": "Animation",
     "author": "Soma Nyiro",
     "version": (0, 1),
@@ -11,10 +11,9 @@ bl_info = {
     "tracker_url": "",
 }
 
-import bpy  # Importing Blender's Python API
+import bpy
 from mathutils import Vector, Quaternion
 
-# Define a simple operator (action)
 class LoopAnimationOperator(bpy.types.Operator):
     bl_idname = "object.loop_animation_operator"
     bl_label = "Loop Animation"
@@ -33,14 +32,12 @@ class LoopAnimationOperator(bpy.types.Operator):
         return context.window_manager.invoke_props_dialog(self)
 
     def execute(self, context):
-        # Get the selected object
         obj = context.object
         
         if obj is None or obj.type != 'ARMATURE':
             self.report({'WARNING'}, "No armature selected")
             return {'CANCELLED'}
         
-        # Ensure the object has animation data
         if obj.animation_data is None or obj.animation_data.action is None:
             self.report({'ERROR'}, "Selected object has no animation data")
             return {'CANCELLED'}
@@ -59,11 +56,9 @@ class LoopAnimationOperator(bpy.types.Operator):
 def loop_animation(obj, ratio, dt, op):
     action = obj.animation_data.action
     
-    # Assuming we're working with bone animations in an armature
     bones = obj.pose.bones
     num_frames = int(action.frame_range[1] - action.frame_range[0])+1
     
-    # Gather raw bone positions and rotations over time (fcurve sampling)
     raw_bone_positions = []
     raw_bone_rotations = []
     
@@ -91,12 +86,9 @@ def loop_animation(obj, ratio, dt, op):
     apply_rotational_offsets(looped_bone_rotations, raw_bone_rotations, offset_bone_rotations)
     
     # Write the looped animation back to Blender
-    
-    # Dictionaries to hold the FCurves for location and rotation_quaternion for each bone
     fcurves_location = {bone.name: [] for bone in bones}
     fcurves_rotation = {bone.name: [] for bone in bones}
 
-    # Locate existing FCurves for location and rotation_quaternion
     for fcurve in action.fcurves:
         for bone in bones:
             if f'pose.bones["{bone.name}"].location' in fcurve.data_path:
@@ -104,36 +96,31 @@ def loop_animation(obj, ratio, dt, op):
             elif f'pose.bones["{bone.name}"].rotation_quaternion' in fcurve.data_path:
                 fcurves_rotation[bone.name].append(fcurve)
 
-        # Loop through each FCurve for location and rotation
     for bone_idx, bone in enumerate(bones):
         bone_name = bone.name
         
-        # Process location fcurves
         if bone_name in fcurves_location:
-            for axis, fcurve in enumerate(fcurves_location[bone_name]):  # X, Y, Z axes for location
+            for axis, fcurve in enumerate(fcurves_location[bone_name]):
                 if fcurve is not None:
                     for keyframe in fcurve.keyframe_points:
                         frame = int(round(keyframe.co[0]))
                         if 0 <= frame < num_frames:
                             keyframe.co[1] = looped_bone_positions[frame][bone_idx][axis]
 
-        # Process rotation fcurves
         if bone_name in fcurves_rotation:
-            for axis, fcurve in enumerate(fcurves_rotation[bone_name]):  # W, X, Y, Z axes for rotation
+            for axis, fcurve in enumerate(fcurves_rotation[bone_name]):
                 if fcurve is not None:
                     for keyframe in fcurve.keyframe_points:
                         frame = int(round(keyframe.co[0]))
                         if 0 <= frame < num_frames:
                             keyframe.co[1] = looped_bone_rotations[frame][bone_idx][axis]
 
-    # Ensure FCurves are updated
     for fcurves in [fcurves_location, fcurves_rotation]:
         for bone_fcurves in fcurves.values():
             for fcurve in bone_fcurves:
                 if fcurve is not None:
                     fcurve.update()
     
-    # Update the scene so the changes are reflected
     bpy.context.view_layer.update()
 
 
@@ -174,9 +161,6 @@ def quat_differentiate_angular_velocity(q1, q2, dt):
 def compute_linear_offsets(offsets, diff, ratio):
     for i in range(len(offsets)):
         for j in range(len(offsets[i])):
-            #factor = ratio * (ratio - 1.0) * (i / (len(offsets) - 1))
-            #offsets[i][j] = factor * diff[j]
-            
             offsets[i][j] = lerp(ratio, ratio-1.0, i / (len(offsets) - 1)) * diff[j]
 
 
@@ -212,9 +196,8 @@ class RemoveRootMotionOperator(bpy.types.Operator):
         return context.window_manager.invoke_props_dialog(self)
 
     def execute(self, context):
-        obj = context.object  # Get the currently selected object
+        obj = context.object
         
-        # Check if an armature is selected and it has animation data
         if obj is None or obj.type != 'ARMATURE':
             self.report({'WARNING'}, "No armature selected")
             return {'CANCELLED'}
@@ -223,24 +206,21 @@ class RemoveRootMotionOperator(bpy.types.Operator):
             self.report({'WARNING'}, "No animation data found")
             return {'CANCELLED'}
         
-        action = obj.animation_data.action  # Access the animation action
+        action = obj.animation_data.action
 
-        # Loop through the F-Curves to find the keyframes for the "Hips" bone's location
         for fcurve in action.fcurves:
-            # We need to target the 'pose.bones["Hips"].location' data path
             if fcurve.data_path == 'pose.bones["Hips"].location':
-                # For X-axis (location[0]) and Z-axis (location[2])
-                if fcurve.array_index == 0 and self.x:  # X-axis (location[0])
+                if fcurve.array_index == 0 and self.x:
                     for keyframe in fcurve.keyframe_points:
-                        keyframe.co[1] = 0  # Set the keyframe value (Y-coordinate) to 0
+                        keyframe.co[1] = 0
 
-                elif fcurve.array_index == 1 and self.y:  # Z-axis (location[2])
+                elif fcurve.array_index == 1 and self.y:
                     for keyframe in fcurve.keyframe_points:
-                        keyframe.co[1] = 0  # Set the keyframe value (Y-coordinate) to 0
+                        keyframe.co[1] = 0
 
-                elif fcurve.array_index == 2 and self.z:  # Z-axis (location[2])
+                elif fcurve.array_index == 2 and self.z:
                     for keyframe in fcurve.keyframe_points:
-                        keyframe.co[1] = 0  # Set the keyframe value (Y-coordinate) to 0
+                        keyframe.co[1] = 0
         
         if self.x:
             self.report({'INFO'}, "Root motion removed on x-axis")
@@ -275,11 +255,11 @@ class SnapKeysToFramesOperator(bpy.types.Operator):
         return {'FINISHED'}
         
 class LooperPanel(bpy.types.Panel):
-    bl_label = "Animation Looper Panel"  # Panel label
-    bl_idname = "OBJECT_PT_make_loop_panel"  # Unique identifier for the panel
-    bl_space_type = 'VIEW_3D'  # Where this panel will appear
-    bl_region_type = 'UI'  # The region of the interface
-    bl_category = "Edit"  # The tab where it will appear
+    bl_label = "Animation Looper Panel"
+    bl_idname = "OBJECT_PT_make_loop_panel"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_category = "Edit"
 
     def draw(self, context):
         layout = self.layout
