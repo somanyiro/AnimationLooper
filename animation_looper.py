@@ -32,6 +32,16 @@ class LoopAnimationOperator(bpy.types.Operator):
         items=lambda self, context: get_actions_enum(context)
     )
 
+    root_enum: bpy.props.EnumProperty(
+        name="Select Root",
+        description="Choose the root bone",
+        items=lambda self, context: get_bones_enum(context)
+    )
+
+    loop_root_x: bpy.props.BoolProperty(name="Loop Root X", default=False)
+    loop_root_y: bpy.props.BoolProperty(name="Loop Root Y", default=True)
+    loop_root_z: bpy.props.BoolProperty(name="Loop Root Z", default=False)
+
     dt = 1.0/60.0
 
     def invoke(self, context, event):
@@ -130,6 +140,14 @@ def loop_animation(obj, ratio, dt, op):
         if bone_name in fcurves_location:
             for axis, fcurve in enumerate(fcurves_location[bone_name]):
                 if fcurve is not None:
+                    if bone_name == op.root_enum:
+                        if fcurve.array_index == 0 and not op.loop_root_x:
+                            continue
+                        if fcurve.array_index == 1 and not op.loop_root_y:
+                            continue
+                        if fcurve.array_index == 2 and not op.loop_root_z:
+                            continue
+
                     for keyframe in fcurve.keyframe_points:
                         frame = int(round(keyframe.co[0]))-1
                         if 0 <= frame < num_frames:
