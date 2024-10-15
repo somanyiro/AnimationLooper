@@ -73,6 +73,14 @@ def get_actions_enum(context):
                 return actions
         return [('NONE', 'None', '')]
 
+def get_bones_enum(context):
+        obj = context.object
+        if obj and obj.type == 'ARMATURE' and obj.animation_data:
+            bones = [(bone.name, bone.name, "") for bone in obj.pose.bones]
+            if bones:
+                return bones
+        return [('NONE', 'None', '')]
+
 def loop_animation(obj, ratio, dt, op):
     action = obj.animation_data.action
     
@@ -208,6 +216,12 @@ class RemoveRootMotionOperator(bpy.types.Operator):
     bl_label = "Remove Root Motion"
     bl_description = "Remove keyframes on the Hips bone"
 
+    root_enum: bpy.props.EnumProperty(
+        name="Select Root",
+        description="Choose the root bone",
+        items=lambda self, context: get_bones_enum(context)
+    )
+
     x: bpy.props.BoolProperty(default=True)
     y: bpy.props.BoolProperty(default=False)
     z: bpy.props.BoolProperty(default=True)
@@ -229,7 +243,7 @@ class RemoveRootMotionOperator(bpy.types.Operator):
         action = obj.animation_data.action
 
         for fcurve in action.fcurves:
-            if fcurve.data_path == 'pose.bones["Hips"].location':
+            if fcurve.data_path == f'pose.bones["{self.root_enum}"].location':
                 if fcurve.array_index == 0 and self.x:
                     for keyframe in fcurve.keyframe_points:
                         keyframe.co[1] = 0
