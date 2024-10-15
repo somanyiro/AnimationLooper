@@ -26,6 +26,12 @@ class LoopAnimationOperator(bpy.types.Operator):
         max=1.0
     )
 
+    action_enum: bpy.props.EnumProperty(
+        name="Select Animation",
+        description="Choose an animation to loop",
+        items=lambda self, context: get_actions_enum(context)
+    )
+
     dt = 1.0/60.0
 
     def invoke(self, context, event):
@@ -42,6 +48,12 @@ class LoopAnimationOperator(bpy.types.Operator):
             self.report({'ERROR'}, "Selected object has no animation data")
             return {'CANCELLED'}
 
+        if self.action_enum == 'NONE':
+            self.report({'ERROR'}, "No animation selected")
+            return {'CANCELLED'}
+
+        obj.animation_data.action = bpy.data.actions.get(self.action_enum)
+
         snap_keys_to_frames(obj.animation_data.action)
 
         try:
@@ -52,7 +64,15 @@ class LoopAnimationOperator(bpy.types.Operator):
             return {'CANCELLED'}
 
         return {'FINISHED'}
-    
+
+def get_actions_enum(context):
+        obj = context.object
+        if obj and obj.type == 'ARMATURE' and obj.animation_data:
+            actions = [(action.name, action.name, "") for action in bpy.data.actions]
+            if actions:
+                return actions
+        return [('NONE', 'None', '')]
+
 def loop_animation(obj, ratio, dt, op):
     action = obj.animation_data.action
     
@@ -255,7 +275,7 @@ class SnapKeysToFramesOperator(bpy.types.Operator):
         return {'FINISHED'}
         
 class LooperPanel(bpy.types.Panel):
-    bl_label = "Animation Looper Panel"
+    bl_label = "Animation Looper"
     bl_idname = "OBJECT_PT_make_loop_panel"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
