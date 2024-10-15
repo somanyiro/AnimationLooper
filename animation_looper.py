@@ -104,7 +104,7 @@ def loop_animation(obj, ratio, dt, op):
     # Apply offsets
     apply_positional_offsets(looped_bone_positions, raw_bone_positions, offset_bone_positions)
     apply_rotational_offsets(looped_bone_rotations, raw_bone_rotations, offset_bone_rotations)
-    
+
     # Write the looped animation back to Blender
     fcurves_location = {bone.name: [] for bone in bones}
     fcurves_rotation = {bone.name: [] for bone in bones}
@@ -123,7 +123,7 @@ def loop_animation(obj, ratio, dt, op):
             for axis, fcurve in enumerate(fcurves_location[bone_name]):
                 if fcurve is not None:
                     for keyframe in fcurve.keyframe_points:
-                        frame = int(round(keyframe.co[0]))
+                        frame = int(round(keyframe.co[0]))-1
                         if 0 <= frame < num_frames:
                             keyframe.co[1] = looped_bone_positions[frame][bone_idx][axis]
 
@@ -131,7 +131,7 @@ def loop_animation(obj, ratio, dt, op):
             for axis, fcurve in enumerate(fcurves_rotation[bone_name]):
                 if fcurve is not None:
                     for keyframe in fcurve.keyframe_points:
-                        frame = int(round(keyframe.co[0]))
+                        frame = int(round(keyframe.co[0]))-1
                         if 0 <= frame < num_frames:
                             keyframe.co[1] = looped_bone_rotations[frame][bone_idx][axis]
 
@@ -140,7 +140,7 @@ def loop_animation(obj, ratio, dt, op):
             for fcurve in bone_fcurves:
                 if fcurve is not None:
                     fcurve.update()
-    
+
     bpy.context.view_layer.update()
 
 
