@@ -169,8 +169,6 @@ def loop_animation(obj, ratio, dt, op):
 
     bpy.context.view_layer.update()
 
-
-
 def compute_start_end_positional_difference(pos, dt):
     pos_diff = []
     vel_diff = []
@@ -306,6 +304,61 @@ class SnapKeysToFramesOperator(bpy.types.Operator):
 
         return {'FINISHED'}
         
+class StitchAnimationsOperator(bpy.types.Operator):
+    bl_idname = "object.stitch_animations_operator"
+    bl_label = "Stitch Animations"
+    bl_description = "Stitch animations together so that the transition between them is smooth"
+
+    ratio: bpy.props.FloatProperty(
+        name="Loop Ratio",
+        description="Ratio of looping blend between start and end",
+        default=0.5,
+        min=0.0,
+        max=1.0
+    )
+
+    start_enum: bpy.props.EnumProperty(
+        name="Start Animation",
+        description="Choose the first animation",
+        items=lambda self, context: get_actions_enum(context)
+    )
+
+    end_enum: bpy.props.EnumProperty(
+        name="End Animation",
+        description="Choose the second animation",
+        items=lambda self, context: get_actions_enum(context)
+    )
+
+    def invoke(self, context, event):
+        return context.window_manager.invoke_props_dialog(self)
+
+    def execute(self, context):
+        obj = context.object
+
+
+        if obj is None or obj.type != 'ARMATURE':
+            self.report({'WARNING'}, "No armature selected")
+            return {'CANCELLED'}
+        
+        if obj.animation_data is None or obj.animation_data.action is None:
+            self.report({'WARNING'}, "No animation data found")
+            return {'CANCELLED'}
+        
+        if self.start_enum == 'NONE' or self.end_enum == 'NONE':
+            self.report({'WARNING'}, "No animations selected")
+            return {'CANCELLED'}
+        
+        if self.start_enum == self.end_enum:
+            self.report({'WARNING'}, "Start and end animations must be different")
+            return {'CANCELLED'}
+
+        action = obj.animation_data.action
+        #stitch_animations(action)
+
+        self.report({'INFO'}, "Animations stitched together")
+
+        return {'FINISHED'}
+
 class LooperPanel(bpy.types.Panel):
     bl_label = "Animation Looper"
     bl_idname = "OBJECT_PT_make_loop_panel"
@@ -317,20 +370,24 @@ class LooperPanel(bpy.types.Panel):
         layout = self.layout
 
         layout.operator("object.loop_animation_operator")
+        layout.operator("object.stitch_animations_operator")
         layout.operator("object.remove_root_motion_operator")
         layout.operator("object.snap_keys_to_frames_operator")
+
 
 def register():
     bpy.utils.register_class(LoopAnimationOperator)
     bpy.utils.register_class(LooperPanel)
     bpy.utils.register_class(RemoveRootMotionOperator)
     bpy.utils.register_class(SnapKeysToFramesOperator)
+    bpy.utils.register_class(StitchAnimationsOperator)
 
 def unregister():
     bpy.utils.unregister_class(LoopAnimationOperator)
     bpy.utils.unregister_class(LooperPanel)
     bpy.utils.unregister_class(RemoveRootMotionOperator)
     bpy.utils.unregister_class(SnapKeysToFramesOperator)
+    bpy.utils.unregister_class(StitchAnimationsOperator)
 
 if __name__ == "__main__":
     register()
