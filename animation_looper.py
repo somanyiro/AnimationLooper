@@ -396,6 +396,7 @@ class StitchAnimationsOperator(bpy.types.Operator):
 
         #anim 1
         obj.animation_data.action = bpy.data.actions.get(self.start_enum)
+        snap_keys_to_frames(obj.animation_data.action)
 
         action_1 = obj.animation_data.action
         num_frames_1 = int(action_1.frame_range[1] - action_1.frame_range[0])+1
@@ -408,13 +409,14 @@ class StitchAnimationsOperator(bpy.types.Operator):
             raw_bone_positions_1.append([bone.location.copy() for bone in bones])
             raw_bone_rotations_1.append([bone.rotation_quaternion.copy() for bone in bones])
         
-        looped_bone_positions_1 = [[Vector() for _ in bones] for _ in range(num_frames_1)]
-        looped_bone_rotations_1 = [[Quaternion() for _ in bones] for _ in range(num_frames_1)]
+        stitched_bone_positions_1 = [[Vector() for _ in bones] for _ in range(num_frames_1)]
+        stitched_bone_rotations_1 = [[Quaternion() for _ in bones] for _ in range(num_frames_1)]
         offset_bone_positions_1 = [[Vector() for _ in bones] for _ in range(num_frames_1)]
         offset_bone_rotations_1 = [[Vector() for _ in bones] for _ in range(num_frames_1)]
 
         #anim 2
         obj.animation_data.action = bpy.data.actions.get(self.end_enum)
+        snap_keys_to_frames(obj.animation_data.action)
 
         action_2 = obj.animation_data.action
         num_frames_2 = int(action_2.frame_range[1] - action_2.frame_range[0])+1
@@ -427,8 +429,8 @@ class StitchAnimationsOperator(bpy.types.Operator):
             raw_bone_positions_2.append([bone.location.copy() for bone in bones])
             raw_bone_rotations_2.append([bone.rotation_quaternion.copy() for bone in bones])
 
-        looped_bone_positions_2 = [[Vector() for _ in bones] for _ in range(num_frames_2)]
-        looped_bone_rotations_2 = [[Quaternion() for _ in bones] for _ in range(num_frames_2)]
+        stitched_bone_positions_2 = [[Vector() for _ in bones] for _ in range(num_frames_2)]
+        stitched_bone_rotations_2 = [[Quaternion() for _ in bones] for _ in range(num_frames_2)]
         offset_bone_positions_2 = [[Vector() for _ in bones] for _ in range(num_frames_2)]
         offset_bone_rotations_2 = [[Vector() for _ in bones] for _ in range(num_frames_2)]
 
@@ -444,15 +446,15 @@ class StitchAnimationsOperator(bpy.types.Operator):
         compute_end_linear_offsets(offset_bone_rotations_2, rot_diff, self.ratio)
 
         # Apply offsets
-        apply_positional_offsets(looped_bone_positions_1, raw_bone_positions_1, offset_bone_positions_1)
-        apply_rotational_offsets(looped_bone_rotations_1, raw_bone_rotations_1, offset_bone_rotations_1)
-        apply_positional_offsets(looped_bone_positions_2, raw_bone_positions_2, offset_bone_positions_2)
-        apply_rotational_offsets(looped_bone_rotations_2, raw_bone_rotations_2, offset_bone_rotations_2)
+        apply_positional_offsets(stitched_bone_positions_1, raw_bone_positions_1, offset_bone_positions_1)
+        apply_rotational_offsets(stitched_bone_rotations_1, raw_bone_rotations_1, offset_bone_rotations_1)
+        apply_positional_offsets(stitched_bone_positions_2, raw_bone_positions_2, offset_bone_positions_2)
+        apply_rotational_offsets(stitched_bone_rotations_2, raw_bone_rotations_2, offset_bone_rotations_2)
 
         # Write stitched animations
-        write_to_animation(obj, looped_bone_positions_2, looped_bone_rotations_2, num_frames_2, self.root_enum, self.stitch_root_x, self.stitch_root_y, self.stitch_root_z)
+        write_to_animation(obj, stitched_bone_positions_2, stitched_bone_rotations_2, num_frames_2, self.root_enum, self.stitch_root_x, self.stitch_root_y, self.stitch_root_z)
         obj.animation_data.action = bpy.data.actions.get(self.start_enum)
-        write_to_animation(obj, looped_bone_positions_1, looped_bone_rotations_1, num_frames_1, self.root_enum, self.stitch_root_x, self.stitch_root_y, self.stitch_root_z)
+        write_to_animation(obj, stitched_bone_positions_1, stitched_bone_rotations_1, num_frames_1, self.root_enum, self.stitch_root_x, self.stitch_root_y, self.stitch_root_z)
         
         self.report({'INFO'}, f"Animations {self.start_enum} and {self.end_enum} stitched together")
 
