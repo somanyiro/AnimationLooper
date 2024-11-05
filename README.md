@@ -20,3 +20,11 @@ This plugin is built on the foundation of [this article](https://theorangeduck.c
 4. Press the "Remove Root Motion" button so that the character stays in place
 5. Press the "Loop Animation" button
 6. Now you should have a smoothly looping animation
+
+## Known Issues
+
+- Too large of a difference between the start and end of the animation can lead to unrealistic movements
+
+## To Do
+
+- Implement more algorithm options from the article
