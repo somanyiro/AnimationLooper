@@ -229,7 +229,7 @@ def write_to_animation(obj, positions, rotations, num_frames, root, alter_pos_x,
                             continue
 
                     for keyframe in fcurve.keyframe_points:
-                        frame = int(round(keyframe.co[0]))-1
+                        frame = int(round(keyframe.co[0]))
                         if 0 <= frame < num_frames:
                             keyframe.co[1] = positions[frame][bone_idx][axis]
 
@@ -237,7 +237,7 @@ def write_to_animation(obj, positions, rotations, num_frames, root, alter_pos_x,
             for axis, fcurve in enumerate(fcurves_rotation[bone_name]):
                 if fcurve is not None:
                     for keyframe in fcurve.keyframe_points:
-                        frame = int(round(keyframe.co[0]))-1
+                        frame = int(round(keyframe.co[0]))
                         if 0 <= frame < num_frames:
                             keyframe.co[1] = rotations[frame][bone_idx][axis]
 
