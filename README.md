@@ -14,6 +14,8 @@ This plugin is built on the foundation of [this article](https://theorangeduck.c
 
 ## How to use
 
+[How to use video](https://youtu.be/R0j3U4BLoeQ)
+
 1. Import an animtion into Blender. (Optionally also bring in a model so you can see more than just bones)
 2. Cut off the beginning and end so that the animation starts and ends with relatively similar poses
 3. Readjust the keyframes so that the animation starts at frame 0
