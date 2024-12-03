@@ -31,3 +31,6 @@ This plugin is built on the foundation of [this article](https://theorangeduck.c
 ## To Do
 
 - Implement more algorithm options from the article
+- Add setting for the algorithm to only affect the beginning and end of the animation
+- Right now the plugin assumes a key exists for every frame, fail saves need to be added for this
+- Add cleanup step to remove unnecessary keys after looping
