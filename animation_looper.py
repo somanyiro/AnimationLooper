@@ -13,6 +13,7 @@ bl_info = {
 
 import bpy
 from mathutils import Vector, Quaternion
+import copy
 
 # ==================== Operators ====================
 
@@ -326,6 +327,80 @@ class CenterAnimationOperator(bpy.types.Operator):
 
         return {'FINISHED'}
 
+class ChangeRootBoneOperator(bpy.types.Operator):
+    bl_idname = "object.change_root_bone_operator"
+    bl_label = "Change Root Bone"
+    bl_description = "Move the root motion track from one bone to the other"
+
+    action_enum: bpy.props.EnumProperty(
+        name="Select Animation",
+        description="Choose an animation to center",
+        items=lambda self, context: get_actions_enum(context)
+    )
+
+    root_enum: bpy.props.EnumProperty(
+        name="Select Root",
+        description="Choose the root bone",
+        items=lambda self, context: get_bones_enum(context)
+    )
+
+    new_root_enum: bpy.props.EnumProperty(
+        name="Select New Root",
+        description="Choose the bone you want to have the root motion",
+        items=lambda self, context: get_bones_enum(context)
+    )
+
+    x: bpy.props.BoolProperty(default=True)
+    y: bpy.props.BoolProperty(default=False)
+    z: bpy.props.BoolProperty(default=True)
+
+    def invoke(self, context, event):
+        return context.window_manager.invoke_props_dialog(self)
+
+    def execute(self, context):
+        obj = context.object
+
+        if obj is None or obj.type != 'ARMATURE':
+            self.report({'WARNING'}, "No armature selected")
+            return {'CANCELLED'}
+        
+        if obj.animation_data is None or obj.animation_data.action is None:
+            self.report({'ERROR'}, "Selected object has no animation data")
+            return {'CANCELLED'}
+
+        if self.action_enum == 'NONE':
+            self.report({'ERROR'}, "No animation selected")
+            return {'CANCELLED'}
+
+        obj.animation_data.action = bpy.data.actions.get(self.action_enum)
+        action = obj.animation_data.action
+
+        root_fcurves_location = []
+        new_root_fcurves_location = []
+
+        for fcurve in action.fcurves:
+            print(fcurve.data_path)
+            if f'pose.bones["{self.root_enum}"].location' in fcurve.data_path:
+                root_fcurves_location.append(fcurve)
+            if f'pose.bones["{self.new_root_enum}"].location' in fcurve.data_path:
+                new_root_fcurves_location.append(fcurve)
+
+        for fcurve in new_root_fcurves_location:
+            action.fcurves.remove(fcurve)
+
+        if self.x:
+            root_fcurves_location[0].data_path = f'pose.bones["{self.new_root_enum}"].location'
+
+        if self.y:
+            root_fcurves_location[1].data_path = f'pose.bones["{self.new_root_enum}"].location'
+        
+        if self.z:
+            root_fcurves_location[2].data_path = f'pose.bones["{self.new_root_enum}"].location'
+
+        self.report({'INFO'}, f"Changed root bone from {self.action_enum} to {self.new_root_enum}")
+
+        return {'FINISHED'}
+
 
 # ==================== Helper functions ====================
 
@@ -554,6 +629,7 @@ class LooperPanel(bpy.types.Panel):
         layout.operator("object.remove_root_motion_operator")
         layout.operator("object.snap_keys_to_frames_operator")
         layout.operator("object.center_animation_operator")
+        layout.operator("object.change_root_bone_operator")
 
 def register():
     bpy.utils.register_class(LoopAnimationOperator)
@@ -562,6 +638,7 @@ def register():
     bpy.utils.register_class(SnapKeysToFramesOperator)
     bpy.utils.register_class(StitchAnimationsOperator)
     bpy.utils.register_class(CenterAnimationOperator)
+    bpy.utils.register_class(ChangeRootBoneOperator)
 
 def unregister():
     bpy.utils.unregister_class(LoopAnimationOperator)
@@ -570,6 +647,7 @@ def unregister():
     bpy.utils.unregister_class(SnapKeysToFramesOperator)
     bpy.utils.unregister_class(StitchAnimationsOperator)
     bpy.utils.unregister_class(CenterAnimationOperator)
+    bpy.utils.unregister_class(ChangeRootBoneOperator)
 
 if __name__ == "__main__":
     register()
