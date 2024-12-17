@@ -34,3 +34,7 @@ This plugin is built on the foundation of [this article](https://theorangeduck.c
 - Add setting for the algorithm to only affect the beginning and end of the animation
 - Right now the plugin assumes a key exists for every frame, fail saves need to be added for this
 - Add cleanup step to remove unnecessary keys after looping
+
+## Support development
+
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/F1F517KH5W)
