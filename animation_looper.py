@@ -3,7 +3,7 @@ bl_info = {
     "blender": (4, 3, 0),
     "category": "Animation",
     "author": "Soma Nyiro",
-    "version": (0, 1),
+    "version": (1, 0),
     "location": "View3D > Tool Shelf",
     "description": "A simple tool for creating looping animations from motion capture data",
     "warning": "",
@@ -157,7 +157,7 @@ class SnapKeysToFramesOperator(bpy.types.Operator):
 
 class StitchAnimationsOperator(bpy.types.Operator):
     bl_idname = "object.stitch_animations_operator"
-    bl_label = "Stitch Animations"
+    bl_label = "Stitch Animations WIP"
     bl_description = "Stitch animations together so that the transition between them is smooth"
 
     ratio: bpy.props.FloatProperty(
@@ -233,13 +233,19 @@ class StitchAnimationsOperator(bpy.types.Operator):
         stitched_bone_rotations_1 = [[Quaternion() for _ in bones] for _ in range(num_frames_1)]
         offset_bone_positions_1 = [[Vector() for _ in bones] for _ in range(num_frames_1)]
         offset_bone_rotations_1 = [[Vector() for _ in bones] for _ in range(num_frames_1)]
-
+        
+        last_frame_offset = bones[next((x for x in range(num_frames_1) if bones[x].name == self.root_enum), None)].location
+        print(f"last frame offset: {last_frame_offset}")
         #anim 2
         obj.animation_data.action = bpy.data.actions.get(self.end_enum)
         snap_keys_to_frames(obj.animation_data.action)
 
         action_2 = obj.animation_data.action
         num_frames_2 = int(action_2.frame_range[1] - action_2.frame_range[0])+1
+
+        # adjust root so that it is in the same place as the last frame of the first animation
+        center_animation_root(obj, self.root_enum, self.stitch_root_x, self.stitch_root_y, self.stitch_root_z)
+        offset_root(obj, self.root_enum, last_frame_offset.x, last_frame_offset.y, last_frame_offset.z)
 
         raw_bone_positions_2 = []
         raw_bone_rotations_2 = []
@@ -329,7 +335,7 @@ class CenterAnimationOperator(bpy.types.Operator):
 
 class ChangeRootBoneOperator(bpy.types.Operator):
     bl_idname = "object.change_root_bone_operator"
-    bl_label = "Change Root Bone"
+    bl_label = "Change Root Bone WIP"
     bl_description = "Move the root motion track from one bone to the other"
 
     action_enum: bpy.props.EnumProperty(
@@ -607,6 +613,27 @@ def center_animation_root(obj, root, center_x, center_y, center_z):
         for keyframe in fcurves_location[2].keyframe_points:
             keyframe.co[1] -= z_offset
 
+    for fcurve in fcurves_location:
+        fcurve.update()
+    
+    bpy.context.view_layer.update()
+
+def offset_root(obj, root, offset_x, offset_y, offset_z):
+    action = obj.animation_data.action
+
+    fcurves_location = []
+
+    for fcurve in action.fcurves:
+        if f'pose.bones["{root}"].location' in fcurve.data_path:
+            fcurves_location.append(fcurve)
+    
+    for keyframe in fcurves_location[0].keyframe_points:
+        keyframe.co[1] + offset_x
+    for keyframe in fcurves_location[1].keyframe_points:
+        keyframe.co[1] + offset_y
+    for keyframe in fcurves_location[2].keyframe_points:
+        keyframe.co[1] + offset_z
+    
     for fcurve in fcurves_location:
         fcurve.update()
     
