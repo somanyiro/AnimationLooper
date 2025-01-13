@@ -3,7 +3,7 @@ bl_info = {
     "blender": (4, 3, 0),
     "category": "Animation",
     "author": "Soma Nyiro",
-    "version": (0, 1),
+    "version": (0, 2),
     "location": "View3D > Tool Shelf",
     "description": "A simple tool for creating looping animations from motion capture data",
     "warning": "",
