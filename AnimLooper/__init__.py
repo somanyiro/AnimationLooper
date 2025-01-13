@@ -29,6 +29,7 @@ class LooperPanel(bpy.types.Panel):
         layout.operator("object.remove_root_motion_operator")
         layout.operator("object.snap_keys_to_frames_operator")
         layout.operator("object.center_animation_operator")
+        layout.operator("object.change_root_bone_operator")
         layout.separator()
         layout.operator("object.play_animation", text="Play Animation", icon="PLAY")
 
@@ -41,6 +42,7 @@ def register():
     bpy.utils.register_class(SnapKeysToFramesOperator)
     bpy.utils.register_class(StitchAnimationsOperator)
     bpy.utils.register_class(CenterAnimationOperator)
+    bpy.utils.register_class(ChangeRootBoneOperator)
     bpy.utils.register_class(PlayAnimationOperator)
 
 def unregister():
@@ -50,6 +52,7 @@ def unregister():
     bpy.utils.unregister_class(SnapKeysToFramesOperator)
     bpy.utils.unregister_class(StitchAnimationsOperator)
     bpy.utils.unregister_class(CenterAnimationOperator)
+    bpy.utils.unregister_class(ChangeRootBoneOperator)
     bpy.utils.unregister_class(PlayAnimationOperator)
 
 #not sure this is needed here
