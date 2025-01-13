@@ -313,8 +313,48 @@ class CenterAnimationOperator(bpy.types.Operator):
 
         return {'FINISHED'}
 
+class PlayAnimationOperator(bpy.types.Operator):
+    bl_idname = "object.play_animation"
+    bl_label = "Play Animation"
+
+    action_enum: bpy.props.EnumProperty(
+        name="Animation",
+        description="Animation to play",
+        items=lambda self, context: get_actions_enum(context)
+    )
+
+    def invoke(self, context, event):
+        return context.window_manager.invoke_props_dialog(self)
+
+    def execute(self, context):
+        obj = context.object
+
+        if obj is None or obj.type != 'ARMATURE':
+            self.report({'WARNING'}, "No armature Selected")
+            return {'CANCELLED'}
+        
+        if self.action_enum is None or self.action_enum == 'NONE':
+            self.report({'WARNING'}, "No action selected")
+            return {'CANCELLED'}
+
+        play_animation(obj, self.action_enum)
+
+        return {'FINISHED'}
+
 
 # ==================== Helper functions ====================
+
+def play_animation(obj, action):
+    obj.animation_data.action = bpy.data.actions.get(action)
+
+    scene = list(bpy.data.scenes)[0]#no idea how to get the current scene so we are using the first one
+    
+    scene.frame_start = int(obj.animation_data.action.frame_range[0])
+    scene.frame_end = int(obj.animation_data.action.frame_range[1])
+    scene.frame_current = int(obj.animation_data.action.frame_range[0])
+    
+    bpy.ops.screen.animation_cancel()
+    bpy.ops.screen.animation_play()
 
 def get_actions_enum(context):
         obj = context.object

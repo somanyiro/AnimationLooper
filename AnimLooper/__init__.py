@@ -20,7 +20,7 @@ class LooperPanel(bpy.types.Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_category = "Edit"
-
+ 
     def draw(self, context):
         layout = self.layout
 
@@ -29,6 +29,10 @@ class LooperPanel(bpy.types.Panel):
         layout.operator("object.remove_root_motion_operator")
         layout.operator("object.snap_keys_to_frames_operator")
         layout.operator("object.center_animation_operator")
+        layout.separator()
+        layout.operator("object.play_animation", text="Play Animation", icon="PLAY")
+
+
 
 def register():
     bpy.utils.register_class(LoopAnimationOperator)
@@ -37,6 +41,7 @@ def register():
     bpy.utils.register_class(SnapKeysToFramesOperator)
     bpy.utils.register_class(StitchAnimationsOperator)
     bpy.utils.register_class(CenterAnimationOperator)
+    bpy.utils.register_class(PlayAnimationOperator)
 
 def unregister():
     bpy.utils.unregister_class(LoopAnimationOperator)
@@ -45,6 +50,7 @@ def unregister():
     bpy.utils.unregister_class(SnapKeysToFramesOperator)
     bpy.utils.unregister_class(StitchAnimationsOperator)
     bpy.utils.unregister_class(CenterAnimationOperator)
+    bpy.utils.unregister_class(PlayAnimationOperator)
 
 #not sure this is needed here
 if __name__ == "__main__":
