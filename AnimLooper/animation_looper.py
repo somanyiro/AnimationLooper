@@ -96,19 +96,27 @@ class RemoveRootMotionOperator(bpy.types.Operator):
         
         action = obj.animation_data.action
 
-        for fcurve in action.fcurves:
-            if fcurve.data_path == f'pose.bones["{self.root_enum}"].location':
-                if fcurve.array_index == 0 and self.x:
-                    for keyframe in fcurve.keyframe_points:
-                        keyframe.co[1] = 0
+        # Blender 5+: fcurves are accessed per-datablock using fcurve_ensure_for_datablock
+        # For the root bone we ensure/get the location fcurves for each axis and zero them if requested
+        for axis, enabled in ((0, self.x), (1, self.y), (2, self.z)):
+            if not enabled:
+                continue
+            try:
+                fcurve = action.fcurve_ensure_for_datablock(datablock=obj, data_path=f'pose.bones["{self.root_enum}"].location', index=axis)
+            except AttributeError as ae:
+                print(f"[AnimLooper][Error] AttributeError when accessing fcurve_ensure_for_datablock: {ae}")
+                print("action type:", type(action), "dir(action) sample:", [n for n in dir(action) if 'fcur' in n or 'fcurve' in n])
+                fcurve = None
+            except Exception as e:
+                print(f"[AnimLooper][Error] Exception when ensuring fcurve: {e}")
+                fcurve = None
 
-                elif fcurve.array_index == 1 and self.y:
-                    for keyframe in fcurve.keyframe_points:
-                        keyframe.co[1] = 0
+            if fcurve is None:
+                continue
 
-                elif fcurve.array_index == 2 and self.z:
-                    for keyframe in fcurve.keyframe_points:
-                        keyframe.co[1] = 0
+            for keyframe in fcurve.keyframe_points:
+                keyframe.co[1] = 0
+            fcurve.update()
         
         if self.x:
             self.report({'INFO'}, "Root motion removed on x-axis")
@@ -392,26 +400,26 @@ class ChangeRootBoneOperator(bpy.types.Operator):
         obj.animation_data.action = bpy.data.actions.get(self.action_enum)
         action = obj.animation_data.action
 
-        root_fcurves_location = []
-        new_root_fcurves_location = []
+        # Get (or create) the fcurves for the root and new root bones for each axis
+        root_fcurves_location = [None, None, None]
+        new_root_fcurves_location = [None, None, None]
 
-        for fcurve in action.fcurves:
-            print(fcurve.data_path)
-            if f'pose.bones["{self.root_enum}"].location' in fcurve.data_path:
-                root_fcurves_location.append(fcurve)
-            if f'pose.bones["{self.new_root_enum}"].location' in fcurve.data_path:
-                new_root_fcurves_location.append(fcurve)
+        for axis in range(3):
+            try:
+                root_fcurves_location[axis] = action.fcurve_ensure_for_datablock(datablock=obj, data_path=f'pose.bones["{self.root_enum}"].location', index=axis)
+            except Exception:
+                root_fcurves_location[axis] = None
+            try:
+                new_root_fcurves_location[axis] = action.fcurve_ensure_for_datablock(datablock=obj, data_path=f'pose.bones["{self.new_root_enum}"].location', index=axis)
+            except Exception:
+                new_root_fcurves_location[axis] = None
 
-        for fcurve in new_root_fcurves_location:
-            action.fcurves.remove(fcurve)
-
-        if self.x:
+        # Change the data_path of the root fcurves to the new root (for enabled axes)
+        if self.x and root_fcurves_location[0] is not None:
             root_fcurves_location[0].data_path = f'pose.bones["{self.new_root_enum}"].location'
-
-        if self.y:
+        if self.y and root_fcurves_location[1] is not None:
             root_fcurves_location[1].data_path = f'pose.bones["{self.new_root_enum}"].location'
-        
-        if self.z:
+        if self.z and root_fcurves_location[2] is not None:
             root_fcurves_location[2].data_path = f'pose.bones["{self.new_root_enum}"].location'
 
         self.report({'INFO'}, f"Changed root bone from {self.action_enum} to {self.new_root_enum}")
@@ -556,42 +564,55 @@ def write_to_animation(obj, positions, rotations, num_frames, root, alter_pos_x,
     action = obj.animation_data.action
     bones = obj.pose.bones
     
+    # Ensure / get fcurves per bone per axis using Blender 5.x API
     fcurves_location = {bone.name: [] for bone in bones}
     fcurves_rotation = {bone.name: [] for bone in bones}
 
-    for fcurve in action.fcurves:
-        for bone in bones:
-            if f'pose.bones["{bone.name}"].location' in fcurve.data_path:
-                fcurves_location[bone.name].append(fcurve)
-            elif f'pose.bones["{bone.name}"].rotation_quaternion' in fcurve.data_path:
-                fcurves_rotation[bone.name].append(fcurve)
+    for bone in bones:
+        # location axes 0..2
+        for axis in range(3):
+            try:
+                f = action.fcurve_ensure_for_datablock(datablock=obj, data_path=f'pose.bones["{bone.name}"].location', index=axis)
+            except Exception:
+                f = None
+            fcurves_location[bone.name].append(f)
+
+        # rotation_quaternion axes 0..3
+        for axis in range(4):
+            try:
+                f = action.fcurve_ensure_for_datablock(datablock=obj, data_path=f'pose.bones["{bone.name}"].rotation_quaternion', index=axis)
+            except Exception:
+                f = None
+            fcurves_rotation[bone.name].append(f)
     
     for bone_idx, bone in enumerate(bones):
         bone_name = bone.name
         
         if bone_name in fcurves_location:
             for axis, fcurve in enumerate(fcurves_location[bone_name]):
-                if fcurve is not None:
-                    if bone_name == root:
-                        if fcurve.array_index == 0 and not alter_pos_x:
-                            continue
-                        if fcurve.array_index == 1 and not alter_pos_y:
-                            continue
-                        if fcurve.array_index == 2 and not alter_pos_z:
-                            continue
+                if fcurve is None:
+                    continue
+                if bone_name == root:
+                    if axis == 0 and not alter_pos_x:
+                        continue
+                    if axis == 1 and not alter_pos_y:
+                        continue
+                    if axis == 2 and not alter_pos_z:
+                        continue
 
-                    for keyframe in fcurve.keyframe_points:
-                        frame = int(round(keyframe.co[0]))
-                        if 0 <= frame < num_frames:
-                            keyframe.co[1] = positions[frame][bone_idx][axis]
+                for keyframe in fcurve.keyframe_points:
+                    frame = int(round(keyframe.co[0]))
+                    if 0 <= frame < num_frames:
+                        keyframe.co[1] = positions[frame][bone_idx][axis]
 
         if bone_name in fcurves_rotation:
             for axis, fcurve in enumerate(fcurves_rotation[bone_name]):
-                if fcurve is not None:
-                    for keyframe in fcurve.keyframe_points:
-                        frame = int(round(keyframe.co[0]))
-                        if 0 <= frame < num_frames:
-                            keyframe.co[1] = rotations[frame][bone_idx][axis]
+                if fcurve is None:
+                    continue
+                for keyframe in fcurve.keyframe_points:
+                    frame = int(round(keyframe.co[0]))
+                    if 0 <= frame < num_frames:
+                        keyframe.co[1] = rotations[frame][bone_idx][axis]
 
     for fcurves in [fcurves_location, fcurves_rotation]:
         for bone_fcurves in fcurves.values():
@@ -605,60 +626,102 @@ def lerp(a: float, b: float, t: float) -> float:
     return a + (b - a) * t
 
 def snap_keys_to_frames(action):
-    for fcurve in action.fcurves:
-        for keyframe in fcurve.keyframe_points:
-            keyframe.co[0] = round(keyframe.co[0])
-        fcurve.update()
+    # Find an object that uses this action as its active action so we can use it as datablock
+    datablock_obj = None
+    for obj in bpy.data.objects:
+        if obj.animation_data and obj.animation_data.action == action:
+            datablock_obj = obj
+            break
+
+    if datablock_obj is None:
+        return
+
+    # Snap location and rotation quaternion keyframes for all pose bones
+    for bone in datablock_obj.pose.bones:
+        # location axes
+        for axis in range(3):
+            try:
+                fcurve = action.fcurve_ensure_for_datablock(datablock=datablock_obj, data_path=f'pose.bones["{bone.name}"].location', index=axis)
+            except Exception:
+                fcurve = None
+            if not fcurve:
+                continue
+            for keyframe in fcurve.keyframe_points:
+                keyframe.co[0] = round(keyframe.co[0])
+            fcurve.update()
+
+        # rotation_quaternion axes
+        for axis in range(4):
+            try:
+                fcurve = action.fcurve_ensure_for_datablock(datablock=datablock_obj, data_path=f'pose.bones["{bone.name}"].rotation_quaternion', index=axis)
+            except Exception:
+                fcurve = None
+            if not fcurve:
+                continue
+            for keyframe in fcurve.keyframe_points:
+                keyframe.co[0] = round(keyframe.co[0])
+            fcurve.update()
 
 def center_animation_root(obj, root, center_x, center_y, center_z):
     action = obj.animation_data.action
 
+    # Ensure/get the three location fcurves for the root bone
     fcurves_location = []
+    for axis in range(3):
+        try:
+            f = action.fcurve_ensure_for_datablock(datablock=obj, data_path=f'pose.bones["{root}"].location', index=axis)
+        except Exception:
+            f = None
+        fcurves_location.append(f)
 
-    for fcurve in action.fcurves:
-        if f'pose.bones["{root}"].location' in fcurve.data_path:
-            fcurves_location.append(fcurve)
-    
     x_offset = 0
     y_offset = 0
     z_offset = 0
 
-    if center_x:
+    if center_x and fcurves_location[0] is not None and len(fcurves_location[0].keyframe_points) > 0:
         x_offset = fcurves_location[0].keyframe_points[0].co[1]
         for keyframe in fcurves_location[0].keyframe_points:
             keyframe.co[1] -= x_offset
-    if center_y:
+    if center_y and fcurves_location[1] is not None and len(fcurves_location[1].keyframe_points) > 0:
         y_offset = fcurves_location[1].keyframe_points[0].co[1]
         for keyframe in fcurves_location[1].keyframe_points:
             keyframe.co[1] -= y_offset
-    if center_z:
+    if center_z and fcurves_location[2] is not None and len(fcurves_location[2].keyframe_points) > 0:
         z_offset = fcurves_location[2].keyframe_points[0].co[1]
         for keyframe in fcurves_location[2].keyframe_points:
             keyframe.co[1] -= z_offset
 
     for fcurve in fcurves_location:
-        fcurve.update()
+        if fcurve is not None:
+            fcurve.update()
     
     bpy.context.view_layer.update()
 
 def offset_root(obj, root, offset_x, offset_y, offset_z):
     action = obj.animation_data.action
 
+    # Ensure/get the three location fcurves for the root bone
     fcurves_location = []
+    for axis in range(3):
+        try:
+            f = action.fcurve_ensure_for_datablock(datablock=obj, data_path=f'pose.bones["{root}"].location', index=axis)
+        except Exception:
+            f = None
+        fcurves_location.append(f)
 
-    for fcurve in action.fcurves:
-        if f'pose.bones["{root}"].location' in fcurve.data_path:
-            fcurves_location.append(fcurve)
-    
-    for keyframe in fcurves_location[0].keyframe_points:
-        keyframe.co[1] + offset_x
-    for keyframe in fcurves_location[1].keyframe_points:
-        keyframe.co[1] + offset_y
-    for keyframe in fcurves_location[2].keyframe_points:
-        keyframe.co[1] + offset_z
-    
+    if fcurves_location[0] is not None:
+        for keyframe in fcurves_location[0].keyframe_points:
+            keyframe.co[1] += offset_x
+    if fcurves_location[1] is not None:
+        for keyframe in fcurves_location[1].keyframe_points:
+            keyframe.co[1] += offset_y
+    if fcurves_location[2] is not None:
+        for keyframe in fcurves_location[2].keyframe_points:
+            keyframe.co[1] += offset_z
+
     for fcurve in fcurves_location:
-        fcurve.update()
-    
+        if fcurve is not None:
+            fcurve.update()
+
     bpy.context.view_layer.update()
 

@@ -1,9 +1,9 @@
 bl_info = {
     "name": "Animation Looper",
-    "blender": (4, 3, 0),
+    "blender": (5, 1, 2),
     "category": "Animation",
     "author": "Soma Nyiro",
-    "version": (0, 2),
+    "version": (0, 3),
     "location": "View3D > Tool Shelf",
     "description": "A simple tool for creating looping animations from motion capture data",
     "warning": "",
